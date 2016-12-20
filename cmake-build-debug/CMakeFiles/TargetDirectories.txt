@@ -1,0 +1,3 @@
+/media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/cmake-build-debug/CMakeFiles/edit_cache.dir
+/media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/cmake-build-debug/CMakeFiles/testTrie.dir

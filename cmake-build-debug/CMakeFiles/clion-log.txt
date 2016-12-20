@@ -1,0 +1,4 @@
+/home/abu/Downloads/clion-2016.3/bin/cmake/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/cmake-build-debug
