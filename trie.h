@@ -105,7 +105,7 @@ void Trie::printTree(){
 
         shared_ptr<cNode> cnode = this->trieWords[i];
 
-        cout << getWord(cnode) << endl;
+        cout << "word: " << getWord(cnode) << " weight: " << cnode->unigramWeight << endl;
 
         if(!cnode->bigrams.empty()){
             cout << "Bigrams: " << endl;
@@ -254,8 +254,8 @@ void Trie::getSetWordNode(const string word, bool &isWordExist, std::shared_ptr<
 
     if(!isWordExist) {
         this->trieWords.push_back(currNode);
-        currNode->unigramWeight = 1;
-        cout << "word added to trie: " << word << endl;
+        currNode->unigramWeight = dummy;  //set to default weight
+        //cout << "word added to trie: " << word << endl;
         LOG("word added");
     }
     else
@@ -278,12 +278,12 @@ bool Trie::getBigram(const string head, vector<pair<string, int>> &results) {
         if(!headNode->bigrams.empty())
             for(int i = 0; i < headNode->bigrams.size(); i++)
                 results.push_back(make_pair(getWord(headNode->bigrams[i]), headNode->bigramWeights[i]));
-        /*else
-            cout << "no bigrams found for the head: " << head << endl;*/
+        else
+            cout << "no bigrams found for the head: " << head << endl;
     }
-    /*else{
-        //cout << head << " does not exist in trie .. head is added to trie";
-    }*/
+    else{
+        cout << head << " does not exist in trie .. head is added to trie";
+    }
 
     return !results.empty();
 
