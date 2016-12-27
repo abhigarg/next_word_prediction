@@ -18,7 +18,7 @@ using namespace std;
 
 vector<string> words;  //or could be vector of pointers to word in a dictionary
 
-int dummy = 0; //dummy weight
+int dummy = 1; //dummy weight
 
 bool isDebug = false;
 
@@ -40,6 +40,18 @@ void LOG(string msg){
         cout << msg << endl;
 }
 
+
+struct trieNode{
+    char value;  //value of node in char
+    unsigned char nChildren; //number of children (max 26)
+    unsigned short int posChildren; //position of first child -- children will be positioned between posChildren and posChildren + nChildren
+    vector<pair<unsigned short int, unsigned char>> posBigrams; // any position possible and corresponding weight
+    unsigned short int posParent; //position of parent of node
+    unsigned char unigramWeight;
+};
+
+
+
 class cNode{
 public:
     char value;  // character value of node
@@ -60,12 +72,32 @@ public:
 };
 
 
+trieNode newTrieNode(const shared_ptr<cNode>& cnode, const unsigned short int& pP, const unsigned short int& pC){
+
+    trieNode node;
+    node.value = cnode->value;
+    node.nChildren = cnode->children.size();  //try to remove parsing to unsigned char here
+    node.posParent = pP;
+    node.posChildren = pC;
+    node.unigramWeight = cnode->unigramWeight;
+
+    return node;
+}
+
+//required for serializing
+vector<shared_ptr<cNode>> trieWords;
+vector<pair<shared_ptr<cNode>, shared_ptr<cNode>>> trieBigrams;
+int numNodes = 0;
+int numChildren = 0;
+int numBigrams = 0;
+int numTrigrams = 0;
+
 class Trie {
 public:
 
     std::shared_ptr<cNode> root;
 
-    vector<shared_ptr<cNode>> trieWords;
+    //vector<shared_ptr<cNode>> trieWords;
 
     Trie(){
 
@@ -101,9 +133,9 @@ void Trie::printTree(){
     cout << "*****************TRIE******************"<< endl << endl;
     cout << "Words in Trie: " << endl << endl;
 
-    for(int i = 0; i < this->trieWords.size(); i++) {
+    for(int i = 0; i < trieWords.size(); i++) {
 
-        shared_ptr<cNode> cnode = this->trieWords[i];
+        shared_ptr<cNode> cnode = trieWords[i];
 
         cout << "word: " << getWord(cnode) << " weight: " << cnode->unigramWeight << endl;
 
@@ -166,8 +198,8 @@ void Trie::getSetWordNode(const string word, bool &isWordExist, std::shared_ptr<
     isWordExist = true;
     currNode = this->root;
 
-    LOG("looking for word: ");
-    LOG(word);
+    //LOG("looking for word: ");
+    //LOG(word);
 
     //const char* wordchar = word.c_str();
 
@@ -175,38 +207,46 @@ void Trie::getSetWordNode(const string word, bool &isWordExist, std::shared_ptr<
 
         char c = word[i];
 
-        LOG("finding node for char: ");
-        LOG(c);
+        //LOG("finding node for char: ");
+        //LOG(c);
 
         if(currNode->children.empty()) {//no child node exist --> add child node
 
-            LOG("no children found .. adding new child");
+            //LOG("no children found .. adding new child");
 
             std::shared_ptr<cNode> cnode = std::make_shared<cNode>();
             cnode->value = word[i];
-            LOG("value for new node: ");
-            LOG(cnode->value);
+            //LOG("value for new node: ");
+            //LOG(cnode->value);
             cnode->parent = currNode;
             currNode->children.push_back(cnode);
             currNode = cnode;
             isWordExist = false;
-            LOG("current node is positioned at: ");
-            LOG(currNode->value);
-            LOG("parent of current node: ");
-            LOG(currNode->parent->value);
+
+            if(currNode->parent == root) //if new node is added to root --> not considered as a child
+                numNodes++;
+            else{  // new node is added to some node other than root
+                numNodes++;
+                numChildren++;
+            }
+
+            //LOG("current node is positioned at: ");
+            //LOG(currNode->value);
+            //LOG("parent of current node: ");
+            //LOG(currNode->parent->value);
             continue;
         }
         else{
-            LOG("children found for current node: ");
-            LOG(currNode->value);
+            //LOG("children found for current node: ");
+            //LOG(currNode->value);
             int count = 0;
-            LOG("number of children for cnode are: ");
-            LOG(to_string(currNode->children.size()));
+            //LOG("number of children for cnode are: ");
+            //LOG(to_string(currNode->children.size()));
 
-            cNode childNode = *(currNode->children[0]);
-            LOG("first child: ");
+            //cNode childNode = *(currNode->children[0]);
+            //LOG("first child: ");
 
-            LOG(childNode.value);
+            //LOG(childNode.value);
             if(currNode->children.size() > 0) {
                 for (int j = 0; j < currNode->children.size(); j++) {
                     //cout << "child char value: " << currNode->children[j]->value << endl;
@@ -217,20 +257,28 @@ void Trie::getSetWordNode(const string word, bool &isWordExist, std::shared_ptr<
                     count++;
                 }
 
-                LOG("count is: ");
-                LOG(to_string(count));
-                LOG("number of children for cnode are: ");
-                LOG(to_string(currNode->children.size()));
+                //LOG("count is: ");
+                //LOG(to_string(count));
+                //LOG("number of children for cnode are: ");
+                //LOG(to_string(currNode->children.size()));
 
                 if(count == currNode->children.size()) {//value does not exist in children --> add child node for value
-                    LOG("char not found in children: ");
-                    LOG(c);
+                    //LOG("char not found in children: ");
+                    //LOG(c);
                     std::shared_ptr<cNode> cnode = std::make_shared<cNode>();
                     cnode->value = c;
                     currNode->children.push_back(cnode);
                     cnode->parent = currNode;
                     currNode = cnode;
                     isWordExist = false;
+
+                    if(currNode->parent == root) //if new node is added to root --> not considered as a child
+                        numNodes++;
+                    else{  // new node is added to some node other than root
+                        numNodes++;
+                        numChildren++;
+                    }
+
                     continue;
                 }
                 else {
@@ -239,31 +287,39 @@ void Trie::getSetWordNode(const string word, bool &isWordExist, std::shared_ptr<
                 }
             }
             else{
-                LOG("no children found for char: ");
-                LOG(c);
+                //LOG("no children found for char: ");
+                //LOG(c);
                 std::shared_ptr<cNode> cnode = std::make_shared<cNode>();
                 cnode->value = c;
                 currNode->children.push_back(cnode);
                 cnode->parent = currNode;
                 currNode = cnode;
                 isWordExist = false;
+
+                if(currNode->parent == root) //if new node is added to root --> not considered as a child
+                    numNodes++;
+                else{  // new node is added to some node other than root
+                    numNodes++;
+                    numChildren++;
+                }
+
                 continue;
             }
         }
     }
 
     if(!isWordExist) {
-        this->trieWords.push_back(currNode);
+        trieWords.push_back(currNode);
         currNode->unigramWeight = dummy;  //set to default weight
         //cout << "word added to trie: " << word << endl;
-        LOG("word added");
+        //LOG("word added");
     }
     else
         currNode->unigramWeight = max(255, currNode->unigramWeight+1);
 
 
-    LOG("parent of leaf node: ");
-    LOG(currNode->parent->value);
+    //LOG("parent of leaf node: ");
+    //LOG(currNode->parent->value);
 
 
 }
