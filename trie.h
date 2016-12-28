@@ -18,7 +18,7 @@ using namespace std;
 
 vector<string> words;  //or could be vector of pointers to word in a dictionary
 
-int dummy = 1; //dummy weight
+unsigned char dummy = 1; //dummy weight
 
 bool isDebug = false;
 
@@ -45,7 +45,9 @@ struct trieNode{
     char value;  //value of node in char
     unsigned char nChildren; //number of children (max 26)
     unsigned short int posChildren; //position of first child -- children will be positioned between posChildren and posChildren + nChildren
-    vector<pair<unsigned short int, unsigned char>> posBigrams; // any position possible and corresponding weight
+    //vector<pair<unsigned short int, unsigned char>> posBigrams; // any position possible and corresponding weight
+    unsigned short int posBigrams[3];
+    unsigned char weightsBigrams[3];
     unsigned short int posParent; //position of parent of node
     unsigned char unigramWeight;
 };
@@ -55,10 +57,10 @@ struct trieNode{
 class cNode{
 public:
     char value;  // character value of node
-    int unigramWeight;
+    unsigned char unigramWeight;
     vector<std::shared_ptr<cNode>> children; //character nodes connected to this character node
     vector<std::shared_ptr<cNode>> bigrams;  //<word1, weight1>, <word2, weight2>, ..
-    vector<int> bigramWeights;
+    vector<unsigned char> bigramWeights;
     vector<vector<std::shared_ptr<cNode>>> trigrams; //word1: <word11, weight1>, <word12, weight2>, ..
                                                  //word2: <word21, weight1>, <word21, weight2>, ..
     vector<vector<int>> trigramWeights;

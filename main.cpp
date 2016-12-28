@@ -4,15 +4,21 @@
 #include <stdlib.h>     /* atoi */
 #include <iostream>
 #include <fstream>
+#include <cstring>
 
 #include "trie.h"
 
 
 int maxLevel = 15;
 
+string allowedLetters = "aiouAI";
+
 //check if a character is a digit or not
 bool isNum(const char c)
 {
+    if(c == 46)
+        return true;
+
     if(c >= 48 && c <= 57)
         return true;
 
@@ -298,7 +304,7 @@ void addUnigrams(Trie &t, const string unigramFile){
 
         if(unigram[1].length() <= maxLevel) {
             t.getSetWordNode(unigram[1], isWordExist, cnode);
-            cnode->unigramWeight = score;
+            cnode->unigramWeight = (unsigned char) (score*255/maxScore);
             linecount++;
         }
 
@@ -356,6 +362,13 @@ void addBigrams(Trie &t, string bigramFile){
         if(bigram[0].length() > maxLevel || bigram[1].length() > maxLevel)
             continue;
 
+        //allow bigrams for only some single character words like a,i,o,u,A,I
+        if(bigram[0].length()==1){
+            if(allowedLetters.find(bigram[0]) == string::npos )
+                continue;
+            //cout << "bigrams: " << bigram[0] << ", " << bigram[1] << ", " << bigram[2] << endl;
+        }
+
         //cout << "bigrams: " << bigram[0] << ", " << bigram[1] << ", " << bigram[2] << endl;
 
         int score = atoi(bigram[2].c_str());
@@ -368,22 +381,28 @@ void addBigrams(Trie &t, string bigramFile){
         t.getSetWordNode(bigram[0], isWord1Exist, cnode1);
         t.getSetWordNode(bigram[1], isWord2Exist, cnode2);
 
-        cnode1->bigrams.push_back(cnode2);
-        cnode1->bigramWeights.push_back(score*255/maxScore);
-        trieBigrams.push_back(make_pair(cnode2, cnode1));
+        /*if(bigram[0].length() == 1)
+            cout << "bigrams: " << bigram[0] << ", " << bigram[1] << ", " << bigram[2] << endl;*/
 
-        //break;
+        //check if bigram has to be added or not
+        //add bigram only if currently there are lesss than 3 bigrams for cnode1 --bigrams are already sorted in the list
 
-        if(nodesWithBigrams.empty())
-            nodesWithBigrams.push_back(cnode1);
-        else
-            if(find(nodesWithBigrams.begin(), nodesWithBigrams.end(), cnode1)-nodesWithBigrams.begin() >= nodesWithBigrams.size())
+        if(cnode1->bigrams.size() < 3) {
+
+            cnode1->bigrams.push_back(cnode2);
+            cnode1->bigramWeights.push_back((unsigned char)(score * 255 / maxScore));
+            trieBigrams.push_back(make_pair(cnode2, cnode1));
+
+            if (nodesWithBigrams.empty())
                 nodesWithBigrams.push_back(cnode1);
-
+            //else if (find(nodesWithBigrams.begin(), nodesWithBigrams.end(), cnode1) - nodesWithBigrams.begin() >= nodesWithBigrams.size())
+            else if(cnode1->bigrams.size()==1)
+                nodesWithBigrams.push_back(cnode1);
+        }
     }
 
     numBigrams = (int)nodesWithBigrams.size();
-    cout << "no of bigrams: " << numBigrams << endl;
+    cout << "no. of bigrams: " << numBigrams << endl;
 }
 
 void buildTrie(Trie &t){
@@ -407,7 +426,7 @@ void serializeTrie( const Trie &t ){
         return;
     }
 
-    vector<trieNode> trieNodeArrays;
+    vector<trieNode> trieNodeArray;
 
     cout << "number of words in trie: " << trieWords.size() << endl;
     cout << "number of children: " << numChildren << endl;
@@ -462,7 +481,6 @@ void serializeTrie( const Trie &t ){
         l++; //move to next level in tree
     }
 
-
     //find positions of top words
     vector<unsigned short int> topWordsPos;
     for(int i = 0; i < topWordNodes.size(); i++){
@@ -488,24 +506,40 @@ void serializeTrie( const Trie &t ){
 
     posC = nodeVec.size();
 
+    int rowLevel = 0;
+
+    shared_ptr<cNode> node = t.root;
+
     while(!nodeVec.empty()){
         vector<shared_ptr<cNode>> nextLevelNodes;
 
         //cout << "number of cnodes: " << nodeVec.size() << endl;
+        cout << "row level: " << rowLevel << endl;
 
         for(int i = 0; i < nodeVec.size(); i++){
 
             //cout << "i: " << i << endl;
+            //when parent changes
+            if(nodes[rowLevel][i]->parent != node){
+                posP++;
+                node = nodes[rowLevel][i]->parent;
+            }
 
             for(int j = 0; j < nodeVec[i]->children.size(); j++)
                 nextLevelNodes.push_back(nodeVec[i]->children[j]);
 
             trieNode newNode = newTrieNode(nodeVec[i], posP, posC);
-            posP++;
+
             posC += nodeVec[i]->children.size();
 
-            vector<pair<unsigned short int, unsigned char>> bigramsPos(3);
+            //vector<pair<unsigned short int, unsigned char>> bigramsPos(3);
             int chk = 0;
+
+            if(rowLevel == 0){
+                cout << "value of node: " << nodeVec[i]->value << endl;
+                cout << "no of bigrams: " << nodeVec[i]->bigrams.size() << endl;
+            }
+
             if(!nodeVec[i]->bigrams.empty()) {
 
                 //cout << "bigrams found " << endl;
@@ -514,7 +548,7 @@ void serializeTrie( const Trie &t ){
                 for (int m = 0; m < nodeVec[i]->bigrams.size(); m++) {
 
                     unsigned short int bigramPos = 0;
-                    unsigned char bigramWeight = nodeVec[i]->bigramWeights[m];
+                    //unsigned char bigramWeight = ;
                     int level = 0;
                     shared_ptr<cNode> tmpcNode = nodeVec[i]->bigrams[m];
                     while (tmpcNode->parent != t.root) {
@@ -528,31 +562,44 @@ void serializeTrie( const Trie &t ){
 
                     bigramPos += (unsigned short int) (find(nodes[level].begin(), nodes[level].end(), nodeVec[i]->bigrams[m]) - nodes[level].begin());
 
-                    bigramsPos[m] = make_pair(bigramPos, bigramWeight);
+                    newNode.posBigrams[m] = bigramPos;
+                    newNode.weightsBigrams[m] = nodeVec[i]->bigramWeights[m];
+
                     if(chk==2)
                         break;
                     chk++;
                 }
+                if(nodeVec[i]->bigrams.size() < 3){
+                    for(int m = chk; m < 3; m++) {
+                        newNode.posBigrams[m] = topWordsPos[m-chk];
+                        newNode.weightsBigrams[m] = (unsigned char)dummy;
+                    }
+                }
 
+                //newNode.posBigrams = bigramsPos;
                 //cout << "number of bigrams: " << bigrams << endl;
                 //cout << "chk: " << chk << endl;
             }
+            else{
 
-
-            if(nodeVec[i]->bigrams.size() < 3){
-                for(int m = chk; m < 3; m++) {
-                    bigramsPos[m] = make_pair(topWordsPos[m-chk], (unsigned char)dummy);
+                for(int m = 0; m < 3; m++){
+                    newNode.posBigrams[m] = 0;
+                    newNode.weightsBigrams[m] = 0;
                 }
             }
 
-            newNode.posBigrams = bigramsPos;
-            trieNodeArrays.push_back(newNode);
+            //newNode.posBigrams = bigramsPos;
+            trieNodeArray.push_back(newNode);
 
             //cout << "pushed to array" << endl;
         }
 
         nodeVec.clear();
         nodeVec = nextLevelNodes;
+        //node = nodes[rowLevel][0];
+        rowLevel++;
+
+        //posP++;
 
     }
 
@@ -681,7 +728,7 @@ void serializeTrie( const Trie &t ){
 
                 newNode.posBigrams = bigramsPos;
 
-                trieNodeArrays.push_back(newNode);
+                trieNodeArray.push_back(newNode);
 
             cout << "node pushed to array" << endl;
             //}
@@ -689,19 +736,19 @@ void serializeTrie( const Trie &t ){
     }*/
 
 
-    cout << "size of trieNodeArrays: " << trieNodeArrays.size() << endl;
+    cout << "size of trieNodeArray: " << trieNodeArray.size() << endl;
 
 
     //serialize -- dump to file
     cout << "writing to file" << endl;
-    ofstream os ("testTrie15.bin", ios::binary);
+    ofstream os ("testTrie15_7.bin", ios::out | ios::binary);
 
-    vector<trieNode>::size_type size1 = trieNodeArrays.size();
+    vector<trieNode>::size_type size1 = trieNodeArray.size();
     os.write((char*)&size1, sizeof(size1));
-    os.write((char*)&trieNodeArrays[0], trieNodeArrays.size() * sizeof(trieNode));
+    os.write((char*)&trieNodeArray[0], trieNodeArray.size() * sizeof(trieNode));
 
 
-    //os.write((const char*)&trieNodeArrays, sizeof(trieNodeArrays));
+    //os.write((const char*)&trieNodeArray, sizeof(trieNodeArray));
     os.close();
 
     cout << "dumped to file" << endl;
@@ -752,24 +799,70 @@ void serializeTrie( const Trie &t ){
 
 }
 
+/*
+void deserializeTrie(Trie &t, const vector<trieNode> &trieNodeArray){
+
+    for(int i = 0; trieNodeArray.size(); i++){
+
+        trieNode node = trieNodeArray[i];
+
+        if()
+
+
+    }
+
+}*/
+
 
 int main() {
 
     //initialize trei
-    Trie t;
+    /*Trie t;
 
     //use unigram, bigram and trigrams to build trie
     buildTrie(t);
 
     cout << "Trie is filled with words " << endl;
 
-    //serialize
-    //serializeTrie(t);
-
     cout << "writing trie to file" << endl;
 
+    //serialize
+    serializeTrie(t);
+
+    cout << "Done!" << endl;*/
+
+    cout << "loading trie from file" << endl;
+
+    vector<trieNode> newTrieNodeArray;
+    trieNode newtrieNode;
+
+    ifstream is("testTrie15_7.bin", ios::in | ios::binary);
+
+
+    vector<trieNode>::size_type size2 = 0;
+    is.read((char*)&size2, sizeof(size2));
+    newTrieNodeArray.resize(size2);
+    is.read((char*)&newTrieNodeArray[0], newTrieNodeArray.size() * sizeof(trieNode));
+
+    is.close();
+    cout << "number of nodes in array read from file: " << newTrieNodeArray.size() << endl;
+
+    cout << "reading from first trieNode: " << endl;
+
+    int p = 30;
+
+    cout << "value: " << newTrieNodeArray[p].value << endl;
+    cout << "parent: " << newTrieNodeArray[p].posParent << endl;
+    cout << "numChildren: " << (int)newTrieNodeArray[p].nChildren << endl;
+    cout << "first bigram: " << newTrieNodeArray[p].posBigrams[0] << endl;
+    cout << "weight of first bigram: " << (int)newTrieNodeArray[p].weightsBigrams[0] << endl;
+
+    /*if(!newTrieNodeArray[0].posBigrams.empty())
+        cout << "numBigrams: " << newTrieNodeArray[0].posBigrams.size();
+    else
+        cout << "no bigrams" << endl;*/
     //use trie to make predictions for test chat
-    testDryRun(t);
+    //testDryRun(t);
 
 
 
