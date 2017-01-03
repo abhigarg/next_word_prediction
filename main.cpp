@@ -4,12 +4,12 @@
 #include <stdlib.h>     /* atoi */
 #include <iostream>
 #include <fstream>
-#include <cstring>
 
 #include "trie.h"
 
+int maxLevel = 3;
 
-int maxLevel = 15;
+int chknum = 7;
 
 string allowedLetters = "aiouAI";
 
@@ -259,7 +259,7 @@ vector<shared_ptr<cNode>> topWordNodes;
 
 void addUnigrams(Trie &t, const string unigramFile){
 
-
+    cout << "adding unigrams to trie .. " << endl;
     //read from unigram file and add to trie
     FILE *uniFile = fopen(unigramFile.c_str(), "r");
     assert(uniFile);
@@ -270,10 +270,13 @@ void addUnigrams(Trie &t, const string unigramFile){
     //cout << "Reading unigrams line by line" << endl;
     while(fgets(line, sizeof(line), uniFile)){
         //cout << "line: " << line << endl;
+        //cout << "linecount: " << linecount << endl;
         string linestr(line);
 
-        if(linestr.empty())
+        if(linestr.empty()) {
+            linecount++;
             continue;
+        }
 
         linestr.erase(remove(linestr.begin(), linestr.end(), '\n'), linestr.end());
         linestr.erase(remove(linestr.begin(), linestr.end(), '\r'), linestr.end());
@@ -291,9 +294,12 @@ void addUnigrams(Trie &t, const string unigramFile){
             break;*/
         int score = atoi(unigram[0].c_str());
 
-        if(linecount==1)
+        //cout << "score: " << score << endl;
+
+        if(linecount==0)
             maxScore = score;
 
+        //cout << "max score: " << maxScore;
         //cout << "word: " << unigram[1] << " score: " << (int)(atoi(unigram[0].c_str())*255/maxScore) << endl;
 
         //add word to trie
@@ -303,13 +309,19 @@ void addUnigrams(Trie &t, const string unigramFile){
         //cout << "length of word: " << unigram[1].length() << endl;
 
         if(unigram[1].length() <= maxLevel) {
+            //cout << "chk1" << endl;
             t.getSetWordNode(unigram[1], isWordExist, cnode);
-            cnode->unigramWeight = (unsigned char) (score*255/maxScore);
+            //cout << "chk6" << endl;
+            //cout << "unigram weight: " << score*255/maxScore << endl;
+            cnode->unigramWeight = (score*255/maxScore); //(unsigned char)
             linecount++;
+            //cout << "chk" << endl;
         }
 
-        if(topWordNodes.size()<3)
+        if(topWordNodes.size()<3) {
             topWordNodes.push_back(cnode);
+            cout << "top word node value: " << cnode->value << endl;
+        }
 
         //cout << "added word: " << unigram[1] << endl;
         //cout << "word count: " << linecount << endl;
@@ -407,9 +419,9 @@ void addBigrams(Trie &t, string bigramFile){
 
 void buildTrie(Trie &t){
 
-    string unigramFile = "/media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/unigrams.txt";
-    string bigramFile = "/media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/ngrams2.ll";
-    string trigramFile = "/media/abu/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/ngrams3.ll";
+    string unigramFile = "/media/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/unigrams.txt";
+    string bigramFile = "/media/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/ngrams2.ll";
+    string trigramFile = "/media/DATA/fromUbuntu/Bobble/keyboard/next_word_prediction/testTrie/ngrams3.ll";
 
     addUnigrams(t, unigramFile);
 
@@ -419,14 +431,13 @@ void buildTrie(Trie &t){
 
 
 //will run as background service
-void serializeTrie( const Trie &t ){
+void serializeTrie( Trie &t, vector<trieNode> &trieNodeArray ){
 
     if(t.root->children.empty()){
         cout << "Trie is empty" << endl;
         return;
     }
 
-    vector<trieNode> trieNodeArray;
 
     cout << "number of words in trie: " << trieWords.size() << endl;
     cout << "number of children: " << numChildren << endl;
@@ -449,7 +460,7 @@ void serializeTrie( const Trie &t ){
 
     for(int i = 0; i < t.root->children.size(); i++){
         nodes[0].push_back(t.root->children[i]);
-        cout << nodes[0][i]->value << ", ";
+        //cout << nodes[0][i]->value << ", ";
         totNodes++;
         if(!t.root->children[i]->children.empty()){
             for(int j = 0; j < t.root->children[i]->children.size(); j++) {
@@ -457,10 +468,7 @@ void serializeTrie( const Trie &t ){
                 totNodes++;
             }
         }
-
     }
-
-    cout << endl;
 
 
     while(1){
@@ -468,8 +476,10 @@ void serializeTrie( const Trie &t ){
             nodes.pop_back();
             break;
         }
+        //cout << endl;
         nodes.push_back(vector<shared_ptr<cNode>>());
         for(int i = 0; i < nodes[l].size(); i++){
+            //cout << nodes[l][i]->value << ",";
             if(!nodes[l][i]->children.empty()){
                 for(int j = 0; j < nodes[l][i]->children.size(); j++) {
                     nodes[l + 1].push_back(nodes[l][i]->children[j]);
@@ -481,7 +491,10 @@ void serializeTrie( const Trie &t ){
         l++; //move to next level in tree
     }
 
+    //cout << endl;
+
     //find positions of top words
+    //cout << "top word positions: ";
     vector<unsigned short int> topWordsPos;
     for(int i = 0; i < topWordNodes.size(); i++){
         shared_ptr<cNode> tmpcNode = topWordNodes[i];
@@ -494,17 +507,21 @@ void serializeTrie( const Trie &t ){
         unsigned short int pos = 0;
 
         for(int j = 0; j < level; j++)
-            pos = pos + nodes[j].size();
+            pos = pos + (unsigned short int)(nodes[j].size());
 
         pos += find(nodes[level].begin(), nodes[level].end(), topWordNodes[i])-nodes[level].begin();
 
         topWordsPos.push_back(pos);
+        //cout << pos << ", ";
     }
 
+    //cout << endl;
 
     vector<shared_ptr<cNode>> nodeVec = t.root->children;
 
-    posC = nodeVec.size();
+    posC = (unsigned short int)(nodeVec.size());
+
+    //cout << "initial child pos: " << posC << endl;
 
     int rowLevel = 0;
 
@@ -514,20 +531,28 @@ void serializeTrie( const Trie &t ){
         vector<shared_ptr<cNode>> nextLevelNodes;
 
         //cout << "number of cnodes: " << nodeVec.size() << endl;
-        cout << "row level: " << rowLevel << endl;
+        //cout << "row level: " << rowLevel << endl;
+
+        //cout << "nodeVec size: " << nodeVec.size() << endl;
 
         for(int i = 0; i < nodeVec.size(); i++){
 
             //cout << "i: " << i << endl;
             //when parent changes
             if(nodes[rowLevel][i]->parent != node){
-                posP++;
+                posP++;  //move to next parent node position with non-zero children
+                while(trieNodeArray[posP-1].nChildren==0)
+                    posP++;
                 node = nodes[rowLevel][i]->parent;
+                //cout << "new parent node value: " << node->value << endl;
             }
 
-            for(int j = 0; j < nodeVec[i]->children.size(); j++)
-                nextLevelNodes.push_back(nodeVec[i]->children[j]);
+            if(!nodeVec[i]->children.empty()){
+                for(int j = 0; j < nodeVec[i]->children.size(); j++)
+                    nextLevelNodes.push_back(nodeVec[i]->children[j]);
+            }
 
+            //cout << "new trieNode: " << endl << "value: " << nodeVec[i]->value << " parent pos: " << posP << endl;
             trieNode newNode = newTrieNode(nodeVec[i], posP, posC);
 
             posC += nodeVec[i]->children.size();
@@ -535,10 +560,10 @@ void serializeTrie( const Trie &t ){
             //vector<pair<unsigned short int, unsigned char>> bigramsPos(3);
             int chk = 0;
 
-            if(rowLevel == 0){
+            /*if(rowLevel == 0){
                 cout << "value of node: " << nodeVec[i]->value << endl;
                 cout << "no of bigrams: " << nodeVec[i]->bigrams.size() << endl;
-            }
+            }*/
 
             if(!nodeVec[i]->bigrams.empty()) {
 
@@ -546,6 +571,8 @@ void serializeTrie( const Trie &t ){
                 //cout << "number of bigrams: " << nodeVec[i]->bigrams.size() << endl;
 
                 for (int m = 0; m < nodeVec[i]->bigrams.size(); m++) {
+
+                    //cout << "m: " << m << endl;
 
                     unsigned short int bigramPos = 0;
                     //unsigned char bigramWeight = ;
@@ -556,32 +583,40 @@ void serializeTrie( const Trie &t ){
                         tmpcNode = tmpcNode->parent;
                     }
 
+                    //cout << "level: " << level << endl;
+
                     for (int p = 0; p < level; p++) {
                         bigramPos += (unsigned short int) nodes[p].size();
                     }
 
                     bigramPos += (unsigned short int) (find(nodes[level].begin(), nodes[level].end(), nodeVec[i]->bigrams[m]) - nodes[level].begin());
 
+                    //cout << "bigramPos: " << bigramPos << endl;
+
                     newNode.posBigrams[m] = bigramPos;
+                    //cout << "i: " << i << endl;
                     newNode.weightsBigrams[m] = nodeVec[i]->bigramWeights[m];
 
                     if(chk==2)
                         break;
                     chk++;
+                    //cout << "chk: " << chk << endl;
                 }
+
+
+//#if NOTDEBUG
                 if(nodeVec[i]->bigrams.size() < 3){
                     for(int m = chk; m < 3; m++) {
                         newNode.posBigrams[m] = topWordsPos[m-chk];
-                        newNode.weightsBigrams[m] = (unsigned char)dummy;
+                        newNode.weightsBigrams[m] = (unsigned char)0;
                     }
                 }
-
+//#endif
                 //newNode.posBigrams = bigramsPos;
                 //cout << "number of bigrams: " << bigrams << endl;
                 //cout << "chk: " << chk << endl;
             }
             else{
-
                 for(int m = 0; m < 3; m++){
                     newNode.posBigrams[m] = 0;
                     newNode.weightsBigrams[m] = 0;
@@ -596,6 +631,8 @@ void serializeTrie( const Trie &t ){
 
         nodeVec.clear();
         nodeVec = nextLevelNodes;
+        //cout << "number of nodes in new level: " << nextLevelNodes.size() << endl;
+        //posP++;
         //node = nodes[rowLevel][0];
         rowLevel++;
 
@@ -738,10 +775,62 @@ void serializeTrie( const Trie &t ){
 
     cout << "size of trieNodeArray: " << trieNodeArray.size() << endl;
 
+    cout << "children of first parent: " << (int)trieNodeArray[0].nChildren << endl;
+
+    cout << "Bigrams of the first node: " << endl;
+
+    int chk = 0;
+
+    for(int i = 0; i < trieNodeArray.size(); i++){
+        if(trieNodeArray[i].weightsBigrams[0] != 0 && trieNodeArray[i].posBigrams[0] != 0){
+
+            chk++;
+
+            if(chk == chknum) {
+                cout << "for original trie...." << endl;
+                cout << "position of node with bigram: " << i << endl;
+                cout << "value of node with bigrams: " << trieNodeArray[i].value << endl;
+                cout << "position of node bigram: " << trieNodeArray[i].posBigrams[0] << endl;
+                cout << "value of node bigram: " << trieNodeArray[trieNodeArray[i].posBigrams[0]].value << endl;
+                cout << "size of nodes: " << nodes.size() << endl;
+            }
+            int level = 0;
+            int pos = 0;
+
+            for(int j = 0; j < nodes.size(); j++){
+                //cout << "posj: " << pos << endl;
+
+                level = j;
+                if(pos + nodes[j].size() <= trieNodeArray[i].posBigrams[0])
+                    pos += nodes[j].size();
+                else
+                    break;
+            }
+
+            //cout << "number of nodes in nodes: " << nodes[level].size() << endl;
+            //chk++;
+
+            //cout << "triNodeArray size: " << trieNodeArray.size() << endl;
+            //cout << "level: " << level << endl;
+            //cout << "pos: " << pos << endl;
+            //pos += (trieNodeArray[i].posBigrams[0]-pos)+1;
+
+            //shared_ptr<cNode> cnode = ;
+
+
+            if(chk == chknum) {
+                cout << "bigram word is: " << t.getWord(nodes[level][trieNodeArray[i].posBigrams[0] - pos]) << endl;
+
+                break;
+            }
+        }
+    }
+
+    //**********************WRITE TO FILE***********************************//
 
     //serialize -- dump to file
-    cout << "writing to file" << endl;
-    ofstream os ("testTrie15_7.bin", ios::out | ios::binary);
+    /*cout << "writing to file" << endl;
+    ofstream os ("testTrie15.bin", ios::out | ios::binary);
 
     vector<trieNode>::size_type size1 = trieNodeArray.size();
     os.write((char*)&size1, sizeof(size1));
@@ -751,7 +840,10 @@ void serializeTrie( const Trie &t ){
     //os.write((const char*)&trieNodeArray, sizeof(trieNodeArray));
     os.close();
 
-    cout << "dumped to file" << endl;
+    cout << "dumped to file" << endl;*/
+
+    //*********************************************************//
+
 
     /*cout << "print words of length 14: " << endl;
 
@@ -799,44 +891,290 @@ void serializeTrie( const Trie &t ){
 
 }
 
-/*
 void deserializeTrie(Trie &t, const vector<trieNode> &trieNodeArray){
 
-    for(int i = 0; trieNodeArray.size(); i++){
+    cout << "deserializing trie ... " << endl;
 
-        trieNode node = trieNodeArray[i];
+    cout << "trieNodeArray size: " << trieNodeArray.size() << endl;
 
-        if()
+    shared_ptr<cNode> cnode = t.root;
+    vector<vector<unsigned char>> numChildren;
+    int parentPos = 0;
+    int level = 0;
+    int maxPosCurrentLevel = 28;  //28
+    int maxNumChildren = 28;  //28
+    int numNodesNextLevel = 0;
+    int posCurrentLevel = 0;
+    int childPosCurrentLevel = 0;
+
+    vector<vector<shared_ptr<cNode>>> nodesVec;
+    nodesVec.push_back(vector<shared_ptr<cNode>>());
+    numChildren.push_back(vector<unsigned char>());
+
+    vector<shared_ptr<cNode>> nodes;
+
+    //fill trie with nodes read from file
+    for(int i = 0; i < trieNodeArray.size(); i++){
+
+        //cout << i << "th node value: " << trieNodeArray[i].value << endl;
+
+        shared_ptr<cNode> currNode = make_shared<cNode>();
+
+        currNode->value = trieNodeArray[i].value;
+
+        //cout << "node value: " << currNode->value << endl;
+        currNode->unigramWeight = trieNodeArray[i].unigramWeight;
+        //cout << "chk" << endl;
+        currNode->parent = cnode;
+
+        cnode->children.push_back(currNode);
+
+        nodesVec[level].push_back(currNode);
+        nodes.push_back(currNode);
+//#if NOTDEBUG
+        if(i == trieNodeArray.size()-1) {
+            cout << "chk" << endl;
+            continue;
+        }
+//#endif
+        //if(nodesVec[level].empty())
+            //numChildren = number of children not updated
+
+
+        numChildren[level].push_back(trieNodeArray[i].nChildren);
+        //nodesVec[level].push_back(make_pair(currNode, trieNodeArray[i].nChildren));
+
+        numNodesNextLevel += trieNodeArray[i].nChildren;
+
+        posCurrentLevel++; //move to next node in current level
+        childPosCurrentLevel++;
+
+        //cout << "posCurrentLevel: " << posCurrentLevel << endl;
+        //cout << "childPosCurrentLevel: " << childPosCurrentLevel << endl;
+
+        //cout << "chk2" << endl;
+
+        //cout << "number of nodes in next level: " << numNodesNextLevel << endl;
+
+        //change of level
+        if(posCurrentLevel == maxPosCurrentLevel){ //reached to first node in next level
+
+            //int posVal = 0;
+
+            //if(level==0){
+            /*cout << "current pos: " << posCurrentLevel << ", max pos: " << maxPosCurrentLevel << endl;
+            cout << "new parent pos: " << (int)(trieNodeArray[i+1].posParent)-1 << endl;
+            cout << "new parent value: " << trieNodeArray[(int)(trieNodeArray[i+1].posParent)-1].value << endl;*/
+
+            if(maxNumChildren==0)
+                cout << "number of children of new parent: " << maxNumChildren << endl;  //number of children of a parent node is coming to be zero
+            //cout << "p: " << i-maxPosCurrentLevel+parentPos << endl;
+            //}
+
+            parentPos = (int)(trieNodeArray[i+1].posParent)-1;
+            maxNumChildren = (int)(trieNodeArray[(int)(trieNodeArray[i+1].posParent)-1].nChildren);
+
+            /*cout << "maxNumChildren: " << maxNumChildren << endl;
+            cout << "size of nodesVec: " << nodesVec[level].size() << endl;*/
+
+            /*parentPos = 0;
+             *while(trieNodeArray[i-maxPosCurrentLevel+parentPos+1].nChildren == 0)
+                parentPos++;*/
+
+            //maxNumChildren = trieNodeArray[i-maxPosCurrentLevel+parentPos+1].nChildren;//(int)(trieNodeArray[(int)(trieNodeArray[i+1].posParent)-1].nChildren);
+
+            cnode = nodes[parentPos]; //move the parent node pointer to the first parent node of the previous level --- parentPos correspond to tnodeArray --- change to
+
+
+            /*while(cnode->children.empty())  //check for number of children from
+                cnode = nodesVec[level][posVal++];*/
+
+            //(int)numChildren[level][0];
+            level++;
+            //cout << "new level: " << level << endl;
+            nodesVec.push_back(vector<shared_ptr<cNode>>());
+            numChildren.push_back(vector<unsigned char>());
+            posCurrentLevel = 0;
+            maxPosCurrentLevel = numNodesNextLevel;
+            //cout << "number of nodes in next level: " << numNodesNextLevel << endl;
+            numNodesNextLevel = 0;
+            //parentPos = 0;
+            childPosCurrentLevel = 0;
+
+        }
+        else{
+            //cout << "chk21" << endl;
+            //cout << "child position current level: " << childPosCurrentLevel << endl;
+            //cout << "total number of children for current parent: " << (int)cnode->children.size() << endl;
+            if(childPosCurrentLevel == maxNumChildren){ //all children of current parent are covered -- move to next parent
+                //if(level == 1)
+
+                parentPos = (int)(trieNodeArray[i+1].posParent)-1;
+                //cout << "new parent pos: " << parentPos << endl;
+                //cout << "new parent value: " << trieNodeArray[(int)(trieNodeArray[i+1].posParent)-1].value << endl;
+                /*if(nodesVec[level].empty()){
+                    cout << "empty nodesVec" << endl;
+                    //break;
+                }*/
+                cnode = nodes[parentPos];
+                //cnode = nodesVec[level-1][parentPos];
+                childPosCurrentLevel = 0;
+                maxNumChildren = (int)(trieNodeArray[(int)(trieNodeArray[i+1].posParent)-1].nChildren);
+                //cout << "number of children of new parent: " << maxNumChildren << endl;
+            }
+
+            //cout << "chk22" << endl;
+        }
+
+        //cout << "chk33" << endl;
+
+    }
+
+
+    cout << "chk3" << endl;
+
+    cout << "nodesvec ..." << endl;
+
+    for(int i = 0; i < nodesVec.size(); i++) {
+        for (int j = 0; j < nodesVec[i].size(); j++)
+            cout << nodesVec[i][j]->value << ", ";
+        cout << endl;
+    }
+
+
+    //maxPosCurrentLevel = (int)t.root->children.size();
+    level = 0;
+    posCurrentLevel = 0;
+    int chk = 0;
+    //fill bigrams
+    for(int i = 0; i < trieNodeArray.size(); i++){
+
+        //cout << "i: " << i << endl;
+
+        if(trieNodeArray[i].posBigrams[0] == 0 && trieNodeArray[i].weightsBigrams[0] == 0) {
+            //cout << "no bigrams found" << endl;
+            continue;
+        }
+
+//#if ISDEBUG
+
+//#endif
+        for(int j = 0; j < 3; j++){
+            int pos = 0;
+            int l = 0;
+
+            for(int m = 0; m < nodesVec.size(); m++){
+                if(pos+nodesVec[m].size() <= trieNodeArray[i].posBigrams[j]){
+                    pos += nodesVec[m].size();
+                    l++;
+                }
+                else
+                    break;
+            }
+
+            /*cout << "pos: " << pos << endl;
+            cout << "posCurrentLevel: " << posCurrentLevel << endl;
+            cout << "pos bigram: " << (int)(trieNodeArray[i].posBigrams[j]) << endl;
+            cout << "size of nodesVec for level-" << l << " is: " << nodesVec[l].size() << endl;*/
+
+            nodesVec[level][posCurrentLevel]->bigrams.push_back(nodesVec[l][trieNodeArray[i].posBigrams[j]-pos]);
+            nodesVec[level][posCurrentLevel]->bigramWeights.push_back(trieNodeArray[i].weightsBigrams[j]);
+
+            /*cout << "j: " << j << endl;
+            cout << "i: " << i << endl;*/
+
+        }
+
+
+        chk++;
+
+        if(chk == chknum){
+            cout << "for deserialised trie.... " << endl;
+            cout << "position of node with bigrams: " << i << endl;
+            cout << "value of node with bigrams: " << trieNodeArray[i].value << endl;
+            cout << "position of node bigram: " << trieNodeArray[i].posBigrams[0] << endl;
+            cout << "value of node bigram: " << trieNodeArray[trieNodeArray[i].posBigrams[0]].value << endl;
+            chk++;
+
+            int l = 0;
+            int pos = 0;
+
+            for(int j = 0; j < nodesVec.size(); j++){
+
+                if(pos + nodesVec[j].size() <= trieNodeArray[i].posBigrams[0]) {
+                    pos += nodesVec[j].size();
+                    l++;
+                }
+                else
+                    break;
+            }
+
+            cout << "pos: " << pos << endl;
+            //cout << "l: " << l << endl;
+
+            cout << "size of nodesvec for level: " << l << " is " << nodesVec[l].size() << endl;
+            //cout << "number of nodes in nodesvec: " << nodesVec[l].size() << endl;
+            cout << "pos bigram: " << trieNodeArray[i].posBigrams[0] << endl;
+            //pos += (trieNodeArray[i].posBigrams[0]-pos)+1;
+
+            //shared_ptr<cNode> cnode = ;
+
+            cout << "bigram word is: " << t.getWord(nodesVec[l][trieNodeArray[i].posBigrams[0] - pos]) << endl;
+
+        }
+
+        //cout << "chk5" << endl;
+
+        posCurrentLevel++;
+
+        if(posCurrentLevel == nodesVec[level].size()){
+            cout << "level: " << level << endl;
+            level++;
+            posCurrentLevel = 0;
+        }
 
 
     }
 
-}*/
+    cout << "level: " << level << endl;
+    cout << "posCurrentLevel: " << posCurrentLevel << endl;
+    cout << "size of nodesVec for level: " << nodesVec[level].size() << endl;
 
+
+}
+
+#define WRITE 1
+#define NOTDEBUG 1
+#define ISDEBUG 1
 
 int main() {
 
+#if WRITE
     //initialize trei
-    /*Trie t;
+    Trie t;
 
     //use unigram, bigram and trigrams to build trie
     buildTrie(t);
+
+    //testDryRun(t);
 
     cout << "Trie is filled with words " << endl;
 
     cout << "writing trie to file" << endl;
 
     //serialize
-    serializeTrie(t);
+    vector<trieNode> trieNodeArray;
+    serializeTrie(t, trieNodeArray);
 
-    cout << "Done!" << endl;*/
+    cout << "Done!" << endl;
 
+#else
     cout << "loading trie from file" << endl;
 
     vector<trieNode> newTrieNodeArray;
     trieNode newtrieNode;
 
-    ifstream is("testTrie15_7.bin", ios::in | ios::binary);
+    ifstream is("testTrie15.bin", ios::in | ios::binary);
 
 
     vector<trieNode>::size_type size2 = 0;
@@ -847,22 +1185,101 @@ int main() {
     is.close();
     cout << "number of nodes in array read from file: " << newTrieNodeArray.size() << endl;
 
+    cout << "creating trie from node array from file ..." << endl;
+#endif
+
+    Trie tNew;
+
+    deserializeTrie(tNew, trieNodeArray);
+
+
+    cout << endl << "********************************TESTING*********************************" << endl;
+
+    cout << "For original trie" << endl;
+
+    cout << "number of nodes under root: " << t.root->children.size() << endl;
+
+    //cout << "trie deserialised .. " << endl;
+
+    //print first layer of nodes
+    for(int i = 0; i < t.root->children.size(); i++){
+        cout << t.root->children[i]->value << ", ";
+    }
+
+
+    if(!t.root->children[0]->children.empty()){
+        cout << "number of children of first node: " << t.root->children[0]->children.size() << endl;
+        cout << "printing children: " << endl;
+
+        for(int i = 0; i < t.root->children[0]->children.size(); i++){
+            cout << t.root->children[0]->children[i]->value << ", ";
+        }
+
+    }
+    else{
+        cout << "no children found for the first node" << endl;
+    }
+
+    /*cout << "Printing original trie:" << endl;
+    t.printTree();*/
+
+
+    cout << endl << "For deserialised trie ------------" << endl;
+
+    cout << "number of nodes under root: " << tNew.root->children.size() << endl;
+
+    //cout << "trie deserialised .. " << endl;
+
+    //print first layer of nodes
+    for(int i = 0; i < tNew.root->children.size(); i++){
+        cout << tNew.root->children[i]->value << ", ";
+    }
+
+
+    if(!tNew.root->children[0]->children.empty()){
+        cout << "number of children of first node: " << tNew.root->children[0]->children.size() << endl;
+        cout << "printing children: " << endl;
+
+        for(int i = 0; i < tNew.root->children[0]->children.size(); i++){
+            cout << tNew.root->children[0]->children[i]->value << ", ";
+        }
+
+    }
+    else{
+        cout << "no children found for the first node" << endl;
+    }
+
+    cout << endl;
+
+
+    /*cout << "printing deserialised tree: " << endl;
+    tNew.printTree();*/
+
+    cout << "******************************************************" << endl;
+    /*
     cout << "reading from first trieNode: " << endl;
 
-    int p = 30;
+    int p = 32;
 
     cout << "value: " << newTrieNodeArray[p].value << endl;
     cout << "parent: " << newTrieNodeArray[p].posParent << endl;
+
+    if(newTrieNodeArray[p].posParent== 0)
+        cout << "parent value: " << " root " << endl;
+    else
+        cout << "parent value: " << newTrieNodeArray[(int)newTrieNodeArray[p].posParent-1].value << endl;
+
     cout << "numChildren: " << (int)newTrieNodeArray[p].nChildren << endl;
     cout << "first bigram: " << newTrieNodeArray[p].posBigrams[0] << endl;
     cout << "weight of first bigram: " << (int)newTrieNodeArray[p].weightsBigrams[0] << endl;
-
+    cout << "first bigram value: " << newTrieNodeArray[(int)(newTrieNodeArray[p].posBigrams[0])].value << endl;*/
+//#endif
     /*if(!newTrieNodeArray[0].posBigrams.empty())
         cout << "numBigrams: " << newTrieNodeArray[0].posBigrams.size();
     else
         cout << "no bigrams" << endl;*/
     //use trie to make predictions for test chat
-    //testDryRun(t);
+  //testDryRun(tNew);
 
 
 

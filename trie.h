@@ -139,12 +139,12 @@ void Trie::printTree(){
 
         shared_ptr<cNode> cnode = trieWords[i];
 
-        cout << "word: " << getWord(cnode) << " weight: " << cnode->unigramWeight << endl;
+        cout << "word: " << getWord(cnode) << " weight: " << (int)(cnode->unigramWeight) << endl;
 
         if(!cnode->bigrams.empty()){
             cout << "Bigrams: " << endl;
             for(int j = 0; j < cnode->bigrams.size(); j++)
-                cout << "      " << getWord(cnode->bigrams[j]) << ", " << cnode->bigramWeights[j] << endl;
+                cout << "      " << getWord(cnode->bigrams[j]) << ", " << (int) (cnode->bigramWeights[j]) << endl;
         }
 
         if(!cnode->trigrams.empty()){
@@ -152,13 +152,13 @@ void Trie::printTree(){
             for(int j = 0; j < cnode->trigrams.size(); j++){
                 cout << getWord(cnode->trigrams[j][0]) << ": " << endl;
                 for(int k = 1; k < cnode->trigrams[j].size(); k++)
-                    cout << "       " << getWord(cnode->trigrams[j][k]) << "  " << cnode->trigramWeights[j][k-1] << endl;
+                    cout << "       " << getWord(cnode->trigrams[j][k]) << "  " << (int) (cnode->trigramWeights[j][k-1]) << endl;
             }
         }
 
     }
 
-    cout << "**************************************"<< endl;
+    cout << "**************************************" << endl;
 
 }
 
@@ -196,7 +196,7 @@ string Trie::getWord(std::shared_ptr<cNode> cnode){
     return reverseWord;
 }
 
-void Trie::getSetWordNode(const string word, bool &isWordExist, std::shared_ptr<cNode> &currNode){
+void Trie::getSetWordNode(const string word, bool &isWordExist, shared_ptr<cNode> &currNode){
     isWordExist = true;
     currNode = this->root;
 
@@ -310,19 +310,23 @@ void Trie::getSetWordNode(const string word, bool &isWordExist, std::shared_ptr<
         }
     }
 
+    //cout << "chk2" << endl;
+
     if(!isWordExist) {
+        //cout << "chk3" << endl;
         trieWords.push_back(currNode);
         currNode->unigramWeight = dummy;  //set to default weight
         //cout << "word added to trie: " << word << endl;
         //LOG("word added");
+        //cout << "chk4" << endl;
     }
     else
-        currNode->unigramWeight = max(255, currNode->unigramWeight+1);
+        currNode->unigramWeight = min(255, currNode->unigramWeight+1);
 
 
     //LOG("parent of leaf node: ");
     //LOG(currNode->parent->value);
-
+    //cout << "chk5" << endl;
 
 }
 
@@ -340,7 +344,7 @@ bool Trie::getBigram(const string head, vector<pair<string, int>> &results) {
             cout << "no bigrams found for the head: " << head << endl;
     }
     else{
-        cout << head << " does not exist in trie .. head is added to trie";
+        cout << head << " does not exist in trie .. head is added to trie" << endl;
     }
 
     return !results.empty();
@@ -357,12 +361,12 @@ bool Trie::getTrigram(const string head1, const string head2, vector<pair<string
     getSetWordNode(head1, isHead1Exist, headNode1);
     getSetWordNode(head2, isHead2Exist, headNode2);
 
-    if(!isHead1Exist || !isHead2Exist) {
+    if(!isHead2Exist || headNode1->bigrams.empty()) {
         //cout << "head do not exist in trie ... head added to trie" << endl;
         //head 1 do not exist and is added --> add head2 as bigram for head1
         headNode1->bigrams.push_back(headNode2);
         headNode1->bigramWeights.push_back(dummy);
-        //cout << "head2 is added as bigram for head1" << endl;
+        cout << "head2 is added as bigram for head1" << endl;
         return false;
     }
 
@@ -384,7 +388,7 @@ bool Trie::getTrigram(const string head1, const string head2, vector<pair<string
                     headNode1->bigrams.push_back(headNode2);
                     headNode1->bigramWeights.push_back(dummy);
                 } else
-                    headNode1->bigramWeights[pos] = max(255, headNode1->bigramWeights[pos]+1); //update weight
+                    headNode1->bigramWeights[pos] = (unsigned char) max(255, (const int)headNode1->bigramWeights[pos]+1); //update weight
             }
         }
 
